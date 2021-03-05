@@ -1,152 +1,174 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using EmbyStat.Common.Extensions;
 using EmbyStat.Common.Models.Entities;
+using EmbyStat.Repositories.Helpers;
 using EmbyStat.Repositories.Interfaces;
-using LiteDB;
-using MediaBrowser.Model.Extensions;
-using NLog;
-using Logger = NLog.Logger;
 
 namespace EmbyStat.Repositories
 {
-    public class ShowRepository : IShowRepository
+    public class ShowRepository : MediaRepository<Show>, IShowRepository
     {
-        private readonly LiteCollection<Show> _showCollection;
-        private readonly LiteCollection<Season> _seasonCollection;
-        private readonly LiteCollection<Episode> _episodeCollection;
-
-        public ShowRepository(IDbContext context)
+        public ShowRepository(IDbContext context) : base(context)
         {
-            _showCollection = context.GetContext().GetCollection<Show>();
-            _seasonCollection = context.GetContext().GetCollection<Season>();
-            _episodeCollection = context.GetContext().GetCollection<Episode>();
+
+        }
+
+        public Show GetShowById(string showId)
+        {
+            return ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Show>();
+
+                return collection.FindById(showId);
+            });
+        }
+
+        public void RemoveShowsThatAreNotUpdated(DateTime startTime)
+        {
+            ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var episodeCollection = database.GetCollection<Episode>();
+                var seasonCollection = database.GetCollection<Season>();
+                var showCollection = database.GetCollection<Show>();
+
+                var shows = showCollection.Find(x => x.LastUpdated < startTime).ToList();
+
+                episodeCollection.DeleteMany(x => shows.Select(y => y.Id).Any(y => y == x.ShowId));
+                seasonCollection.DeleteMany(x => shows.Select(y => y.Id).Any(y => y == x.ParentId));
+                showCollection.DeleteMany(x => shows.Select(y => y.Id).Any(y => y == x.Id));
+            });
+        }
+
+        public void AddSeason(Season season)
+        {
+            ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Season>();
+                collection.Insert(season);
+            });
+        }
+
+        public void AddEpisode(Episode episode)
+        {
+            ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Episode>();
+                collection.Insert(episode);
+            });
         }
 
         public void RemoveShows()
         {
-            _seasonCollection.Delete(Query.All());
-            _episodeCollection.Delete(Query.All());
-            _showCollection.Delete(Query.All());
-        }
-
-        public void InsertShowsBulk(IEnumerable<Show> list)
-        {
-            _showCollection.InsertBulk(list);
-        }
-
-        public void InsertSeasonsBulk(IEnumerable<Season> seasons)
-        {
-            _seasonCollection.InsertBulk(seasons);
-        }
-
-        public void InsertEpisodesBulk(IEnumerable<Episode> episodes)
-        {
-            _episodeCollection.InsertBulk(episodes);
-        }
-
-        public void UpdateShow(Show show)
-        {
-            _showCollection.Update(show);
-        }
-
-        public IEnumerable<Show> GetAllShows(IReadOnlyList<string> collectionIds)
-        {
-            return GetAllShows(collectionIds, false, false);
-        }
-
-        public IEnumerable<Show> GetAllShows(IReadOnlyList<string> collectionIds, bool includeSeasons, bool includeEpisodes)
-        {
-            var query = _showCollection;
-
-            if (includeSeasons)
+            ExecuteQuery(() =>
             {
-                query = query.Include(x => x.Seasons);
-            }
+                using var database = Context.CreateDatabaseContext();
+                var episodeCollection = database.GetCollection<Episode>();
+                var seasonCollection = database.GetCollection<Season>();
+                var showCollection = database.GetCollection<Show>();
 
-            if (includeEpisodes)
-            {
-                query = query.Include(x => x.Episodes);
-            }
+                episodeCollection.DeleteMany("1=1");
+                seasonCollection.DeleteMany("1=1");
+                showCollection.DeleteMany("1=1");
+            });
+        }
 
-            if (collectionIds.Any())
+        public Dictionary<Show, int> GetShowsWithMostEpisodes(IReadOnlyList<string> libraryIds, int count)
+        {
+            return ExecuteQuery(() =>
             {
-                var bArray = new BsonArray();
-                foreach (var collectionId in collectionIds)
+                using var database = Context.CreateDatabaseContext();
+                var query = database.GetCollection<Show>()
+                    .Include(x => x.Seasons)
+                    .Include(x => x.Episodes);
+
+                var list = libraryIds.Any() ? query.Find(x => libraryIds.Any(y => y == x.CollectionId)) : query.FindAll();
+                return list
+                    .Select(x => new {Show = x, EpisodeCount = x.GetNonSpecialEpisodeCount(false)})
+                    .OrderByDescending(x => x.EpisodeCount)
+                    .Take(count)
+                    .ToDictionary(x => x.Show, x => x.EpisodeCount);
+            });
+        }
+
+        public void InsertShow(Show show)
+        {
+            ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var episodeCollection = database.GetCollection<Episode>();
+                var seasonCollection = database.GetCollection<Season>();
+                var showCollection = database.GetCollection<Show>();
+
+                episodeCollection.DeleteMany(x => x.ShowId == show.Id);
+                seasonCollection.DeleteMany(x =>  x.ParentId == show.Id);
+                showCollection.DeleteMany(x => x.Id == show.Id);
+                database.Commit();
+
+                episodeCollection.Upsert(show.Episodes);
+                seasonCollection.Upsert(show.Seasons);
+                showCollection.Upsert(show);
+            });
+        }
+
+        public List<Show> GetAllShows(IReadOnlyList<string> libraryIds, bool includeSeasons, bool includeEpisodes)
+        {
+            return ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Show>();
+                if (includeSeasons)
                 {
-                    bArray.Add(collectionId);
+                    collection = collection.Include(x => x.Seasons);
                 }
 
-                //TODO: klopt niet!
-                return query.Find(Query.In("CollectionId", bArray));
-            }
+                if (includeEpisodes)
+                {
+                    collection = collection.Include(x => x.Episodes);
+                }
 
-            return query.FindAll();
+                if (libraryIds.Any())
+                {
+                    return collection.Find(x => libraryIds.Any(y => y == x.CollectionId)).ToList();
+                }
+
+                return collection.FindAll().ToList();
+            });
         }
 
         public Season GetSeasonById(string id)
         {
-            return _seasonCollection.FindById(id);
-        }
-
-        public int GetShowCountForPerson(string personId)
-        {
-            return _showCollection.Count(Query.EQ("People[*]._id", personId));
-        }
-
-        public IEnumerable<Show> GetAllShowsWithTvdbId()
-        {
-            return _showCollection
-                .IncludeAll(1)
-                .Find(x => !string.IsNullOrWhiteSpace(x.TVDB));
-        }
-
-        public IEnumerable<Episode> GetAllEpisodesForShow(int showId)
-        {
-            return _episodeCollection.Find(Query.EQ("ShowId", showId));
-        }
-
-        public int GetEpisodeCountForShow(int showId)
-        {
-            return GetEpisodeCountForShow(showId, false);
-        }
-
-        public int GetEpisodeCountForShow(int showId, bool includeSpecials)
-        {
-            var show = _showCollection.FindById(showId);
-
-            if (!includeSpecials)
+            return ExecuteQuery(() =>
             {
-                return show.Episodes.Count(x => x.IndexNumber != 0);
-            }
-
-            return show.Episodes.Count;
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Season>();
+                return collection.FindById(id);
+            });
         }
 
-        public int GetSeasonCountForShow(int showId)
+        public List<Episode> GetAllEpisodesForShow(string showId)
         {
-            return GetSeasonCountForShow(showId, false);
-        }
-
-        public int GetSeasonCountForShow(int showId, bool includeSpecials)
-        {
-            var show = _showCollection.FindById(showId);
-
-            if (!includeSpecials)
+            return ExecuteQuery(() =>
             {
-                return show.Seasons.Count(x => x.IndexNumber != 0);
-            }
-            
-            return show.Seasons.Count();
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Episode>();
+                return collection.Find(x => x.ShowId == showId).OrderBy(x => x.IndexNumber).ToList();
+            });
         }
 
-        public bool AnyShows()
+        public Episode GetEpisodeById(string showId, string id)
         {
-            return _showCollection.Exists(Query.All());
-        }
-
-        public Episode GetEpisodeById(string id)
-        {
-            return _episodeCollection.FindById(id);
+            return ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Episode>();
+                return collection.Find(x => x.Id == id && x.ShowId == showId).SingleOrDefault();
+            });
         }
     }
 }

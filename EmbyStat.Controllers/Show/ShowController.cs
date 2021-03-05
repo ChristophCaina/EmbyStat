@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using System.Threading.Tasks;
 using AutoMapper;
+using EmbyStat.Common.Helpers;
 using EmbyStat.Controllers.HelperClasses;
 using EmbyStat.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -19,30 +19,30 @@ namespace EmbyStat.Controllers.Show
             _showService = showService;
             _mapper = mapper;
         }
-        
+
         [HttpGet]
-        [Route("collections")]
-        public IActionResult GetCollections()
+        [Route("libraries")]
+        public IActionResult GetLibraries()
         {
-            var result = _showService.GetShowCollections();
-            return Ok(_mapper.Map< IList<CollectionViewModel>>(result));
+            var result = _showService.GetShowLibraries();
+            return Ok(_mapper.Map<IList<LibraryViewModel>>(result));
         }
 
         [HttpGet]
         [Route("statistics")]
-        public async Task<IActionResult> GetStatistics(List<string> collectionIds)
+        public IActionResult GetStatistics(List<string> libraryIds)
         {
-            var result = await _showService.GetStatistics(collectionIds);
+            var result = _showService.GetStatistics(libraryIds);
             var convert = _mapper.Map<ShowStatisticsViewModel>(result);
             return Ok(convert);
         }
 
         [HttpGet]
         [Route("collectedlist")]
-        public IActionResult GetCollection(List<string> collectionIds)
+        public IActionResult GetCollectedRows(List<string> libraryIds, int page)
         {
-            var result = _showService.GetCollectionRows(collectionIds);
-            return Ok(_mapper.Map<IList<ShowCollectionRowViewModel>>(result));
+            var result = _showService.GetCollectedRows(libraryIds, page);
+            return Ok(_mapper.Map<ListContainer<ShowCollectionRowViewModel>>(result));
         }
 
         [HttpGet]

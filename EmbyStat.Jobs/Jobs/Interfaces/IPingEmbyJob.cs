@@ -1,8 +1,6 @@
-﻿using System;
-
-namespace EmbyStat.Jobs.Jobs.Interfaces
+﻿namespace EmbyStat.Jobs.Jobs.Interfaces
 {
-    public interface IPingEmbyJob : IBaseJob, IDisposable
+    public interface IPingEmbyJob : IBaseJob
     {
     }
 }

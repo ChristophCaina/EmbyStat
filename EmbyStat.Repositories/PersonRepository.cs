@@ -1,29 +1,33 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using EmbyStat.Common.Models.Entities;
+﻿using EmbyStat.Common.Models.Entities;
 using EmbyStat.Repositories.Interfaces;
-using LiteDB;
 
 namespace EmbyStat.Repositories
 {
-    public class PersonRepository : IPersonRepository
+    public class PersonRepository : BaseRepository, IPersonRepository
     {
-        private readonly LiteCollection<Person> _personCollection;
-
-        public PersonRepository(IDbContext context)
+        public PersonRepository(IDbContext context) : base(context)
         {
-            _personCollection = context.GetContext().GetCollection<Person>();
+
         }
 
-        public void UpserRange(IEnumerable<Person> people)
+        public void Upsert(Person person)
         {
-            _personCollection.Upsert(people);
+            ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Person>();
+                collection.Upsert(person);
+            });
         }
 
-        public Person GetPersonByName(string id)
+        public Person GetPersonByName(string name)
         {
-            return _personCollection.FindOne(x => x.Id == id);
+            return ExecuteQuery(() =>
+            {
+                using var database = Context.CreateDatabaseContext();
+                var collection = database.GetCollection<Person>();
+                return collection.FindOne(x => x.Name == name);
+            });
         }
     }
 }

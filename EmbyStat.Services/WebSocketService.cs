@@ -2,16 +2,17 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using EmbyStat.Clients.Emby.WebSocket;
+using EmbyStat.Clients.Base.WebSocket;
 using EmbyStat.Common.Converters;
+using EmbyStat.Logging;
 using EmbyStat.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
-using NLog;
 
 namespace EmbyStat.Services
 {
-    public class WebSocketService : IWebSocketService, IDisposable
+    public class WebSocketService : IHostedService, IDisposable
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly Logger _logger;
@@ -21,7 +22,7 @@ namespace EmbyStat.Services
         public WebSocketService(IServiceScopeFactory scopeFactory)
         {
             _scopeFactory = scopeFactory;
-            _logger = LogManager.GetCurrentClassLogger();
+            _logger = LogFactory.CreateLoggerForType(typeof(WebSocketService), "WEB-SOCKET-SERVICE");
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -32,37 +33,35 @@ namespace EmbyStat.Services
 
         private async void TryToConnect(object state)
         {
-            using (var scope = _scopeFactory.CreateScope())
+            using var scope = _scopeFactory.CreateScope();
+            var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+            var webSocketApi = scope.ServiceProvider.GetRequiredService<IWebSocketApi>();
+
+            if (!webSocketApi.IsWebSocketOpenOrConnecting)
             {
-                var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
-                var webSocketApi = scope.ServiceProvider.GetRequiredService<IWebSocketApi>();
-
-                if (!webSocketApi.IsWebSocketOpenOrConnecting)
+                var settings = settingsService.GetUserSettings();
+                if (settings != null && !string.IsNullOrWhiteSpace(settings.MediaServer.ApiKey))
                 {
-                    var settings = settingsService.GetUserSettings();
-                    if (settings != null && !string.IsNullOrWhiteSpace(settings.Emby.AccessToken))
+                    try
                     {
-                        try
-                        {
-                            var deviceId = settings.Id.ToString();
+                        var deviceId = settings.Id.ToString();
 
-                            webSocketApi.OnWebSocketConnected += ClientOnWebSocketConnected;
-                            webSocketApi.OnWebSocketClosed += WebSocketApiOnWebSocketClosed;
-                            webSocketApi.SessionsUpdated += WebSocketApiSessionsUpdated;
-                            webSocketApi.UserDataChanged += WebSocketApiUserDataChanged;
-                            await webSocketApi.OpenWebSocket(settings.FullEmbyServerAddress, settings.Emby.AccessToken, deviceId);
-                        }
-                        catch (Exception e)
-                        {
-                            _logger.Error(e, "Failed to open socket connection to Emby");
-                            throw;
-                        }
+                        webSocketApi.OnWebSocketConnected += ClientOnWebSocketConnected;
+                        webSocketApi.OnWebSocketClosed += WebSocketApiOnWebSocketClosed;
+                        webSocketApi.SessionsUpdated += WebSocketApiSessionsUpdated;
+                        webSocketApi.UserDataChanged += WebSocketApiUserDataChanged;
+                        await webSocketApi.OpenWebSocket(settings.MediaServer.FullSocketAddress, settings.MediaServer.ApiKey, deviceId);
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.Error(e, "Failed to open socket connection to MediaServer");
+                        throw;
                     }
                 }
-                else
-                {
-                    _timer.Change(60000, 60000);
-                }
+            }
+            else
+            {
+                _timer.Change(60000, 60000);
             }
         }
 

@@ -12,39 +12,36 @@ namespace EmbyStat.Jobs.Jobs.Sync
     [DisableConcurrentExecution(60)]
     public class SmallSyncJob : BaseJob, ISmallSyncJob
     {
-        private readonly IEmbyService _embyService;
+        private readonly IMediaServerService _mediaServerService;
 
-        public SmallSyncJob(IJobHubHelper hubHelper, IJobRepository jobRepository, ISettingsService settingsService, IEmbyService embyService) : base(hubHelper, jobRepository, settingsService)
+        public SmallSyncJob(IJobHubHelper hubHelper, IJobRepository jobRepository, ISettingsService settingsService, 
+            IMediaServerService mediaServerService) 
+            : base(hubHelper, jobRepository, settingsService, typeof(SmallSyncJob), Constants.LogPrefix.SmallMediaServerSyncJob)
         {
-            _embyService = embyService;
+            _mediaServerService = mediaServerService;
             Title = jobRepository.GetById(Id).Title;
         }
 
         public sealed override Guid Id => Constants.JobIds.SmallSyncId;
-        public override string JobPrefix => Constants.LogPrefix.SmallEmbySyncJob;
+        public override string JobPrefix => Constants.LogPrefix.SmallMediaServerSyncJob;
         public override string Title { get; }
 
         public override async Task RunJobAsync()
         {
-            await _embyService.GetAndProcessServerInfo(Settings.FullEmbyServerAddress, Settings.Emby.AccessToken);
+            _mediaServerService.GetAndProcessServerInfo();
             await LogInformation("Server info downloaded");
             await LogProgress(35);
 
-            await _embyService.GetAndProcessPluginInfo(Settings.FullEmbyServerAddress, Settings.Emby.AccessToken);
+            _mediaServerService.GetAndProcessPluginInfo();
             await LogInformation("Server plugins downloaded");
             await LogProgress(55);
 
-            await _embyService.GetAndProcessEmbyUsers(Settings.FullEmbyServerAddress, Settings.Emby.AccessToken);
+            _mediaServerService.GetAndProcessUsers();
             await LogInformation("Server users downloaded");
             await LogProgress(80);
 
-            await _embyService.GetAndProcessDevices(Settings.FullEmbyServerAddress, Settings.Emby.AccessToken);
+            _mediaServerService.GetAndProcessDevices();
             await LogInformation("Server devices downloaded");
-        }
-
-        public void Dispose()
-        {
-            _embyService.Dispose();
         }
     }
 }

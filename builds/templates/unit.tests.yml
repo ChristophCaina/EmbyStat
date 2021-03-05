@@ -1,0 +1,38 @@
+steps:    
+  - task: DotNetCoreCLI@2
+    displayName: 'Backend unit testing'
+    inputs:
+      command: test
+      arguments: '--collect "Code Coverage"'
+      testRunTitle: 'Beta unit tests'
+
+  - task: CmdLine@2
+    displayName: 'Install FE test packages'
+    inputs:
+      script: |
+        npm install eslint typescript @angular/cli lodash -g
+      workingDirectory: 'EmbyStat.Web/ClientApp'
+      
+  - task: CmdLine@2
+    displayName: 'Run npm install'
+    inputs:
+      script: |
+        npm install
+      workingDirectory: 'EmbyStat.Web/ClientApp'
+   
+  - task: CmdLine@2
+    displayName: 'Run eslint'
+    inputs:
+      script: |
+        npm run lint
+      workingDirectory: 'EmbyStat.Web/ClientApp'
+
+  - task: CopyFiles@2
+    displayName: 'Copy Test result files'
+    inputs:
+      SourceFolder: '$(Agent.TempDirectory)'
+      Contents: |
+        **\*.trx
+        **\*.coverage
+        **\report.json
+      TargetFolder: '$(Common.TestResultsDirectory)'

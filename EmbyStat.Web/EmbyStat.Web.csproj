@@ -1,123 +1,46 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <TypeScriptCompileBlocked>true</TypeScriptCompileBlocked>
     <TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
     <IsPackable>false</IsPackable>
     <SpaRoot>ClientApp\</SpaRoot>
+    <ApplicationIcon>..\branding\NSIS\install.ico</ApplicationIcon>
     <DefaultItemExcludes>$(DefaultItemExcludes);$(SpaRoot)node_modules\**</DefaultItemExcludes>
+    <PublishWithAspNetCoreTargetManifest>false</PublishWithAspNetCoreTargetManifest>
 
     <!-- Set this to true if you enable server-side prerendering -->
     <BuildServerSideRenderer>false</BuildServerSideRenderer>
     <Platforms>AnyCPU;x64;x86</Platforms>
-    <Version>0.0.0.0</Version>
-    <AssemblyVersion>0.0.0.0</AssemblyVersion>
-    <FileVersion>0.0.0.0</FileVersion>
+    <Version>1.2.3.4</Version>
+    <AssemblyVersion>1.2.3.4</AssemblyVersion>
+    <FileVersion>1.2.3.4</FileVersion>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <AssemblyName>EmbyStat</AssemblyName>
+
+    <ProjectGuid>{1D5D997D-34AE-45BE-9935-13E0D63EAC02}</ProjectGuid>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="8.1.1" />
-    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="6.1.1" />
-    <PackageReference Include="CommandLineParser" Version="2.5.0" />
-    <PackageReference Include="FluentMigrator.Runner" Version="3.2.1" />
-    <PackageReference Include="Hangfire.AspNetCore" Version="1.7.5" />
+    <PackageReference Include="AutoMapper" Version="10.0.0" />
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="FluentMigrator.Runner" Version="3.2.9" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.7.12" />
     <PackageReference Include="Hangfire.MemoryStorage.Core" Version="1.4.0" />
     <PackageReference Include="Hangfire.RecurringJobExtensions" Version="1.1.6" />
-    <PackageReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Microsoft.AspNetCore.Hosting" Version="2.2.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="3.1.7" />
+    <PackageReference Include="Microsoft.AspNetCore.Hosting" Version="2.2.7" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="3.1.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.7" />
+    <PackageReference Include="Microsoft.OpenApi" Version="1.2.3" />
     <PackageReference Include="Microsoft.Packaging.Tools.Trimming" Version="1.1.0-preview1-26619-01" />
-    <PackageReference Include="NLog.Web.AspNetCore" Version="4.8.4" />
-    <PackageReference Include="Rollbar.NetCore.AspNet" Version="3.2.0" />
-    <PackageReference Include="Rollbar.PlugIns.NLog" Version="3.2.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="4.0.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Don't publish the SPA source files, but do show them in the project files list -->
-    <Compile Remove="ClientApp\dist\**" />
-    <Compile Remove="ClientApp\src\app\about\**" />
-    <Compile Remove="ClientApp\src\app\activity\**" />
-    <Compile Remove="ClientApp\src\app\components\**" />
-    <Compile Remove="ClientApp\src\app\logs\**" />
-    <Compile Remove="ClientApp\src\app\movie\**" />
-    <Compile Remove="ClientApp\src\app\server\**" />
-    <Compile Remove="ClientApp\src\app\settings\**" />
-    <Compile Remove="ClientApp\src\app\show\**" />
-    <Compile Remove="ClientApp\src\app\user\**" />
-    <Compile Remove="wwwroot\**" />
-    <Content Remove="$(SpaRoot)**" />
-    <Content Remove="ClientApp\dist\**" />
-    <Content Remove="ClientApp\src\app\about\**" />
-    <Content Remove="ClientApp\src\app\activity\**" />
-    <Content Remove="ClientApp\src\app\components\**" />
-    <Content Remove="ClientApp\src\app\logs\**" />
-    <Content Remove="ClientApp\src\app\movie\**" />
-    <Content Remove="ClientApp\src\app\server\**" />
-    <Content Remove="ClientApp\src\app\settings\**" />
-    <Content Remove="ClientApp\src\app\show\**" />
-    <Content Remove="ClientApp\src\app\user\**" />
-    <Content Remove="wwwroot\**" />
-    <None Include="$(SpaRoot)**" Exclude="$(SpaRoot)node_modules\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Remove="ClientApp\dist\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\about\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\activity\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\components\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\logs\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\movie\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\server\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\settings\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\show\**" />
-    <EmbeddedResource Remove="ClientApp\src\app\user\**" />
-    <EmbeddedResource Remove="wwwroot\**" />
-    <None Remove="ClientApp\dist\**" />
-    <None Remove="ClientApp\src\app\about\**" />
-    <None Remove="ClientApp\src\app\activity\**" />
-    <None Remove="ClientApp\src\app\components\**" />
-    <None Remove="ClientApp\src\app\logs\**" />
-    <None Remove="ClientApp\src\app\movie\**" />
-    <None Remove="ClientApp\src\app\server\**" />
-    <None Remove="ClientApp\src\app\settings\**" />
-    <None Remove="ClientApp\src\app\show\**" />
-    <None Remove="ClientApp\src\app\user\**" />
-    <None Remove="wwwroot\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Remove="ClientApp\src\app\app-material.module.ts" />
-    <None Remove="ClientApp\src\app\shared\error.interceptor.ts" />
-    <None Remove="ClientApp\src\app\shared\guards\sync.guard.ts" />
-    <None Remove="ClientApp\src\app\shared\helpers\configHelper.ts" />
-    <None Remove="ClientApp\src\app\shared\helpers\listToQueryParam.ts" />
-    <None Remove="ClientApp\src\app\shared\models\bar.ts" />
-    <None Remove="ClientApp\src\app\shared\models\collection.ts" />
-    <None Remove="ClientApp\src\app\shared\models\list-container.ts" />
-    <None Remove="ClientApp\src\app\shared\models\poster.js" />
-    <None Remove="ClientApp\src\app\shared\models\poster.js" />
-    <None Remove="ClientApp\src\app\shared\models\poster.js.map" />
-    <None Remove="ClientApp\src\app\shared\models\poster.js.map" />
-    <None Remove="ClientApp\src\app\shared\pipes\shorten-string.pipe.ts" />
-    <None Remove="ClientApp\src\app\shared\services\emby.service.ts" />
-    <None Remove="ClientApp\src\app\shared\services\language.service.spec.ts" />
-    <None Remove="ClientApp\src\app\shared\services\language.service.spec.ts" />
-    <None Remove="ClientApp\src\app\shared\services\side-bar.service.ts" />
-    <None Remove="ClientApp\src\app\shared\services\system.service.ts" />
-    <None Remove="ClientApp\src\app\shared\services\toast.service.ts" />
-    <None Remove="ClientApp\src\app\shared\services\update-overlay.service.ts" />
-    <None Remove="ClientApp\src\app\shared\services\update.service.ts" />
-    <None Remove="ClientApp\src\app\states\app.actions.ts" />
-    <None Remove="ClientApp\src\app\states\app.state.ts" />
-    <None Remove="win10-x64-v0.1.0-beta.37.zip" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <WCFMetadata Include="Connected Services" />
+    <PackageReference Include="MWKL.AspNetCore.Identity.LiteDB" Version="1.0.2" />
+    <PackageReference Include="NLog.Web.AspNetCore" Version="4.9.3" />
+    <PackageReference Include="Rollbar.NetCore.AspNet" Version="3.12.2" />
+    <PackageReference Include="Rollbar.PlugIns.NLog" Version="3.12.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="5.5.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -129,72 +52,33 @@
   </ItemGroup>
 
   <ItemGroup>
-    <TypeScriptCompile Include="ClientApp\src\app\shared\guards\sync.guard.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\helpers\configHelper.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\helpers\listToQueryParam.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\material.module.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\models\collection.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\models\list-container.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\pipes\shorten-string.pipe.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\services\update.service.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\services\update-overlay.service.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\services\side-bar.service.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\services\system.service.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\services\emby.service.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\services\job-socket.service.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\services\toast.service.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\states\app.actions.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\states\app.state.ts" />
-    <TypeScriptCompile Include="ClientApp\src\app\shared\models\user-id.ts" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Database\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="Microsoft.AspNetCore">
-      <HintPath>..\..\..\.nuget\packages\microsoft.aspnetcore\2.2.0\lib\netstandard2.0\Microsoft.AspNetCore.dll</HintPath>
-    </Reference>
-    <Reference Include="Rollbar">
-      <HintPath>..\..\..\Desktop\Rollbar.NET-master\Rollbar\bin\Debug\netcoreapp2.1\Rollbar.dll</HintPath>
-    </Reference>
+    <Content Update="ClientApp\**\*.*" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Update="Settings\nlog.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <Content Update="nlog.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
-  <Target Name="DebugEnsureNodeEnv" BeforeTargets="Build" Condition=" '$(Configuration)' == 'Debug' And !Exists('$(SpaRoot)node_modules') ">
-    <!-- Ensure Node.js is installed -->
-    <Exec Command="node --version" ContinueOnError="true">
-      <Output TaskParameter="ExitCode" PropertyName="ErrorCode" />
-    </Exec>
-    <Error Condition="'$(ErrorCode)' != '0'" Text="Node.js is required to build and run this project. To continue, please install Node.js from https://nodejs.org/, and then restart your command prompt or IDE." />
-    <Message Importance="high" Text="Restoring dependencies using 'npm'. This may take several minutes..." />
-    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
-  </Target>
-
-  <Target Name="PublishRunWebpack" AfterTargets="ComputeFilesToPublish">
-    <!-- As part of publishing, ensure the JS resources are freshly built in production mode -->
-    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
-    <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build -- --prod" />
-    <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build:ssr -- --prod" Condition=" '$(BuildServerSideRenderer)' == 'true' " />
-
-    <!-- Include the newly-built files in the publish output -->
-    <ItemGroup>
-      <DistFiles Include="$(SpaRoot)dist\**; $(SpaRoot)dist-server\**" />
-      <DistFiles Include="$(SpaRoot)node_modules\**" Condition="'$(BuildServerSideRenderer)' == 'true'" />
-      <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
-        <RelativePath>%(DistFiles.Identity)</RelativePath>
-        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      </ResolvedFileToPublish>
-    </ItemGroup>
-  </Target>
-
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <TypeScriptTarget>ES2019</TypeScriptTarget>
+    <TypeScriptJSXEmit>React</TypeScriptJSXEmit>
+    <TypeScriptModuleKind>AMD</TypeScriptModuleKind>
+    <TypeScriptCompileOnSaveEnabled>True</TypeScriptCompileOnSaveEnabled>
+    <TypeScriptNoImplicitAny>False</TypeScriptNoImplicitAny>
+    <TypeScriptRemoveComments>True</TypeScriptRemoveComments>
+    <TypeScriptOutFile />
+    <TypeScriptOutDir />
+    <TypeScriptGeneratesDeclarations>False</TypeScriptGeneratesDeclarations>
+    <TypeScriptNoEmitOnError>True</TypeScriptNoEmitOnError>
+    <TypeScriptSourceMap>True</TypeScriptSourceMap>
+    <TypeScriptMapRoot />
+    <TypeScriptSourceRoot />
+  </PropertyGroup>
 </Project>

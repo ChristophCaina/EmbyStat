@@ -292,10 +292,14 @@ __pycache__/
 *.db-journal
 .sonarcube
 
-*.js
+**/src/app/**/*.js
 *.js.map
 
 **/*.ver
 **/updateFiles/**
 
 usersettings.json
+**/Embystat.Web/config/**
+**/issues.json
+**/coverage/**
+**/ClientApp/build/**

@@ -6,10 +6,10 @@ using EmbyStat.Common.Models.Entities;
 using EmbyStat.Common.Models.Settings;
 using EmbyStat.Common.Models.Tasks;
 using EmbyStat.Common.Models.Tasks.Enum;
+using EmbyStat.Logging;
 using EmbyStat.Repositories.Interfaces;
 using EmbyStat.Services.Interfaces;
 using Hangfire;
-using NLog;
 
 namespace EmbyStat.Jobs
 {
@@ -19,31 +19,31 @@ namespace EmbyStat.Jobs
         protected readonly IJobHubHelper HubHelper;
         protected readonly ISettingsService SettingsService;
         private readonly IJobRepository _jobRepository;
-        private readonly Logger _logger;
+        protected readonly Logger Logger;
         private JobState State { get; set; }
         private DateTime? StartTimeUtc { get; set; }
         protected UserSettings Settings { get; set; }
         protected bool EnableUiLogging { get; set; }
 
-        protected BaseJob(IJobHubHelper hubHelper, IJobRepository jobRepository, ISettingsService settingsService, bool enableUiLogging)
+        protected BaseJob(IJobHubHelper hubHelper, IJobRepository jobRepository, ISettingsService settingsService, bool enableUiLogging, Type type, string prefix)
         {
             HubHelper = hubHelper;
             _jobRepository = jobRepository;
             Settings = settingsService.GetUserSettings();
             SettingsService = settingsService;
-            _logger = LogManager.GetCurrentClassLogger();
             EnableUiLogging = enableUiLogging;
+            Logger = LogFactory.CreateLoggerForType(type, prefix);
         }
 
-        protected BaseJob(IJobHubHelper hubHelper, IJobRepository jobRepository, ISettingsService settingsService)
-            :this(hubHelper, jobRepository, settingsService, true)
+        protected BaseJob(IJobHubHelper hubHelper, IJobRepository jobRepository, ISettingsService settingsService, Type type, string prefix)
+            :this(hubHelper, jobRepository, settingsService, true, type, prefix)
         {
             
         }
 
         public abstract Guid Id { get; }
-        public abstract string JobPrefix { get; }
         public abstract string Title { get; }
+        public abstract string JobPrefix { get; }
         public abstract Task RunJobAsync();
 
         public async Task Execute()
@@ -61,7 +61,7 @@ namespace EmbyStat.Jobs
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Error while running job");
+                Logger.Error(e, "Error while running job");
                 await FailExecution("Job failed, check logs for more info.");
                 throw;
             }
@@ -69,6 +69,11 @@ namespace EmbyStat.Jobs
 
         private async Task PreJobExecution()
         {
+            if (!Settings.WizardFinished)
+            {
+                throw new WizardNotFinishedException("Job not running because wizard is not finished");
+            }
+
             await SendLogProgressToFront(0);
             await LogInformation("Starting job");
 
@@ -77,11 +82,6 @@ namespace EmbyStat.Jobs
             var job = new Job { CurrentProgressPercentage = 0, Id = Id, State = State, StartTimeUtc = StartTimeUtc, EndTimeUtc = null };
 
             _jobRepository.StartJob(job);
-
-            if (!Settings.WizardFinished)
-            {
-                throw new WizardNotFinishedException("Job not running because wizard is not finished");
-            }
         }
 
         private async Task PostJobExecution()
@@ -95,6 +95,7 @@ namespace EmbyStat.Jobs
             await LogInformation(Math.Abs(Math.Ceiling(runTime) - 1) < 0.1
                 ? "Job finished after 1 minute."
                 : $"Job finished after {Math.Ceiling(runTime)} minutes.");
+            await LogProgress(100);
         }
 
         private async Task FailExecution()
@@ -123,20 +124,20 @@ namespace EmbyStat.Jobs
         {
             if (EnableUiLogging)
             {
-                _logger.Info($"{JobPrefix}\t{message}");
+                Logger.Info(message);
                 await SendLogUpdateToFront(message, ProgressLogType.Information);
             }
         }
 
         public async Task LogWarning(string message)
         {
-            _logger.Warn($"{JobPrefix}\t{message}");
+            Logger.Warn(message);
             await SendLogUpdateToFront(message, ProgressLogType.Warning);
         }
 
         public async Task LogError(string message)
         {
-            _logger.Error($"{JobPrefix}\t{message}");
+            Logger.Error(message);
             await SendLogUpdateToFront(message, ProgressLogType.Error);
         }
 

@@ -1,0 +1,15 @@
+steps: 
+  - script: 'npm install'
+    displayName: 'Npm install'
+    workingDirectory: 'EmbyStat.Web/ClientApp'
+
+  - script: 'npm ${{ parameters.npmBuild }}'
+    displayName: 'Build frontend'
+    workingDirectory: 'EmbyStat.Web/ClientApp'
+  
+  - task: CopyFiles@2
+    displayName: 'Copy frontend to publish folder'
+    inputs:
+      SourceFolder: 'EmbyStat.Web/ClientApp/build'
+      Contents: '**'
+      TargetFolder: 'publish/dist'

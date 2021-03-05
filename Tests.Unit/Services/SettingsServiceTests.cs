@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using Castle.Components.DictionaryAdapter;
-using EmbyStat.Common.Models.Entities;
 using EmbyStat.Common.Models.Settings;
 using EmbyStat.Services;
 using FluentAssertions;
@@ -13,7 +11,6 @@ using Xunit;
 
 namespace Tests.Unit.Services
 {
-    [Collection("Services collection")]
     public class SettingsServiceTests
     {
         private readonly SettingsService _subject;
@@ -29,7 +26,7 @@ namespace Tests.Unit.Services
             };
 
             var appSettingsMock = new Mock<IOptions<AppSettings>>();
-            appSettingsMock.Setup(x => x.Value).Returns(new AppSettings { Version = "0.0.0.0", Dirs = new Dirs { Settings = "Settings" }, Rollbar = rollbar });
+            appSettingsMock.Setup(x => x.Value).Returns(new AppSettings { Version = "0.0.0.0", Dirs = new Dirs { Config = "config" }, Rollbar = rollbar });
 
             _subject = new SettingsService(appSettingsMock.Object);
         }
@@ -44,13 +41,13 @@ namespace Tests.Unit.Services
                 AutoUpdate = false,
                 KeepLogsCount = 10,
                 Language = "en-US",
-                MovieCollectionTypes = new EditableList<CollectionType>(),
-                ShowCollectionTypes = new List<CollectionType>()
+                MovieLibraries = new List<string>(),
+                ShowLibraries = new List<string>()
             };
 
             var strJson = JsonConvert.SerializeObject(fileSettings, Formatting.Indented);
-            Directory.CreateDirectory("Settings");
-            var dir = Path.Combine("Settings", "usersettings.json");
+            Directory.CreateDirectory("config");
+            var dir = Path.Combine("config", "usersettings.json");
             File.WriteAllText(dir, strJson);
         }
 
@@ -65,14 +62,15 @@ namespace Tests.Unit.Services
                 AutoUpdate = false,
                 KeepLogsCount = 10,
                 Language = "en-US",
-                MovieCollectionTypes = new EditableList<CollectionType>(),
-                ShowCollectionTypes = new List<CollectionType>()
+                MovieLibraries = new List<string>(),
+                ShowLibraries = new List<string>(),
+                MediaServer = new MediaServerSettings()
             };
 
             _subject.LoadUserSettingsFromFile();
             await _subject.SaveUserSettingsAsync(settings);
 
-            var settingsFilePath = Path.Combine("Settings", "usersettings.json");
+            var settingsFilePath = Path.Combine("config", "usersettings.json");
             File.Exists(settingsFilePath).Should().BeTrue();
             var loadedSettings = JsonConvert.DeserializeObject<UserSettings>(File.ReadAllText(settingsFilePath));
 

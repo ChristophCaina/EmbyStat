@@ -7,15 +7,23 @@ namespace EmbyStat.Common
         public static class Movies
         {
             public static string TotalMovies => "MOVIES.TOTALMOVIES";
-            public static string TotalGenres => "MOVIES.TOTALGENRES";
             public static string LowestRated => "MOVIES.LOWESTRATED";
             public static string HighestRated => "MOVIES.HIGHESTRATED";
             public static string OldestPremiered => "MOVIES.OLDESTPREMIERED";
-            public static string YoungestPremiered => "MOVIES.YOUNGESTPREMIERED";
+            public static string NewestPremiered => "MOVIES.NEWESTPREMIERED";
             public static string Shortest => "MOVIES.SHORTEST";
             public static string Longest => "MOVIES.LONGEST";
-            public static string YoungestAdded => "MOVIES.YOUNGESTADDED";
+            public static string LatestAdded => "MOVIES.LATESTADDED";
             public static string TotalPlayLength => "MOVIES.TOTALPLAYLENGTH";
+        }
+
+        public static class Icons
+        {
+            public static string TheatersRoundedIcon => "TheatersRoundedIcon";
+            public static string StorageRoundedIcon => "StorageRoundedIcon";
+            public static string QueryBuilderRoundedIcon => "QueryBuilderRoundedIcon";
+            public static string PoundRoundedIcon => "PoundRoundedIcon";
+            public static string PeopleAltRoundedIcon => "PeopleAltRoundedIcon";
         }
 
         public static class Common
@@ -26,6 +34,8 @@ namespace EmbyStat.Common
             public static string MostFeaturedActor => "COMMON.MOSTFEATUREDACTOR";
             public static string MostFeaturedDirector => "COMMON.MOSTFEATUREDDIRECTOR";
             public static string MostFeaturedWriter => "COMMON.MOSTFEATUREDWRITER";
+            public static string TotalDiskSize => "COMMON.TOTALDISKSIZE";
+            public static string TotalGenres => "COMMON.TOTALGENRES";
         }
 
         public static class Shows
@@ -37,8 +47,8 @@ namespace EmbyStat.Common
             public static string HighestRatedShow => "SHOWS.HIGHESTRATEDSHOW";
             public static string LowestRatedShow => "SHOWS.LOWESTRATEDSHOW";
             public static string OldestPremiered => "SHOWS.OLDESTPREMIERED";
-            public static string YoungestPremiered => "SHOWS.YOUNGESTPREMIERED";
-            public static string YoungestAdded => "SHOWS.YOUNGESTADDED";
+            public static string NewestPremiered => "SHOWS.NEWESTPREMIERED";
+            public static string LatestAdded => "SHOWS.LATESTADDED";
             public static string MostEpisodes => "SHOWS.WITHMOESTEPISODES";
             public static string ShowStatusChart => "SHOWS.SHOWSTATUSGRAPH";
         }
@@ -65,18 +75,12 @@ namespace EmbyStat.Common
 
         public static class LogPrefix
         {
-            public static string ServerApi => "SERVER-API";
-            public static string DatabaseSeeder => "DATABASE-SEEDER";
-            public static string MediaSyncJob => "MEDIASYNC-JOB";
-            public static string CheckUpdateJob => "CHECKUDPATE-JOB";
-            public static string PingEmbyJob => "PINGEMBYSERVER-JOB";
-            public static string SmallEmbySyncJob => "SMALLEMBYSYNC-JOB";
+            public static string MediaSyncJob => "MEDIA-SYNC";
+            public static string CheckUpdateJob => "UPDATE-CHECKER";
+            public static string PingMediaServerJob => "PING";
+            public static string SmallMediaServerSyncJob => "SYSTEM-SYNC";
             public static string System => "SYSTEM";
-            public static string EmbyClient => "EMBY-CLIENT";
-            public static string TheTVDBCLient => "THETVDB-CLIENT";
-            public static string ExceptionHandler => "EXCEPTION-HANDLER";
-            public static string DatabaseCleanupJob => "DATABASE CLEANUP-JOB";
-            public static string JobController => "JOB CONTROLLER";
+            public static string DatabaseCleanupJob => "DATABASE-CLEANUP";
         }
 
         public static class JobIds
@@ -88,32 +92,37 @@ namespace EmbyStat.Common
             public static Guid DatabaseCleanupId => new Guid("b109ca73-0563-4062-a3e2-f7e6a00b73e9");
         }
 
+        public static class JwtClaims
+        {
+            public static string Admin => "admin";
+            public static string User => "user";
+        }
+
+        public static class JwtClaimIdentifiers
+        {
+            public static string Roles => "roles";
+            public static string Id => "id";
+        }
+
         //CHARTS
-        public static string CountPerGenre => "COMMON.COUNTPERGENRE";
-        public static string CountPerCommunityRating => "COMMON.COUNTPERCOMMUNITYRATING";
-        public static string CountPerPremiereYear => "COMMON.COUNTPERPREMIEREDATE";
-        public static string CountPerCollectedRate => "COMMON.COUNTPERCOLLECTEDRATE";
-        public static string CountPerOfficialRating => "COMMON.COUNTPEROFFICIALRATING";
+        public static string CountPerGenre => "COMMON.GENRES";
+        public static string CountPerCommunityRating => "COMMON.COMMUNITYRATING";
+        public static string CountPerPremiereYear => "COMMON.PREMIEREDATE";
+        public static string CountPerCollectedPercentage => "COMMON.COLLECTEDPERCENTAGE";
+        public static string CountPerOfficialRating => "COMMON.OFFICIALRATING";
 
         //COMMON
         public static string Unknown => "UNKNOWN";
         
         //QUALITIES
-        public static string FOURK => "4K";
-        public static string THOUSANDFOURFOURP => "1440P";
-        public static string FULLHD => "1080P";
-        public static string HDREADY => "720P";
-        public static string FOURHUNDERDEIGHTY => "480P";
-        public static string LOWEST => "< 480P";
+        public static string FourK => "4K";
+        public static string Qhd => "1440P";
+        public static string FullHd => "1080P";
+        public static string HdReady => "720P";
+        public static string FourHunderdEighty => "480P";
+        public static string Dvd => "< 480P";
 
         //DUPLICATE REASONS
         public static string ByImdb => "BYIMDB";
-
-        public static class PersonType
-        {
-            public static string Actor = "Actor";
-            public static string Director = "Director";
-            public static string Writer = "Writer";
-        }
     }
 }

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using EmbyStat.Common.Enums;
 using EmbyStat.Common.Models.Entities;
 using EmbyStat.Common.Models.Entities.Helpers;
-using MediaBrowser.Model.Entities;
+using EmbyStat.Common.Models.Net;
 
 namespace Tests.Unit.Builders
 {
@@ -12,26 +12,30 @@ namespace Tests.Unit.Builders
     {
         private readonly Show _show;
 
-        public ShowBuilder(int id, string collectionId)
+        public ShowBuilder(Show show)
+        {
+            _show = show;
+        }
+
+        public ShowBuilder(string id, string libraryId)
         {
             _show = new Show
             {
                 Id = id,
                 Path = "Path/To/Show",
                 Banner = "banner.png",
-                CollectionId = collectionId,
-                CommunityRating = null,
-                CumulativeRunTimeTicks = 12000000,
+                CollectionId = libraryId,
+                CommunityRating = 1.7f,
+                CumulativeRunTimeTicks = 19400287400000,
                 DateCreated = new DateTimeOffset(2001, 01, 01, 0, 0, 0, new TimeSpan(0)),
                 IMDB = "12345",
                 Logo = "logo.jpg",
-                MissingEpisodesCount = 0,
                 Name = "Chuck",
                 OfficialRating = "R",
-                ParentId = collectionId,
+                ParentId = libraryId,
                 Primary = "primary.jpg",
                 ProductionYear = 2001,
-                RunTimeTicks = 19400287400000,
+                RunTimeTicks = 12000000,
                 SortName = "Chuck",
                 Status = "Ended",
                 TMDB = "12345",
@@ -40,16 +44,16 @@ namespace Tests.Unit.Builders
                 TvdbFailed = false,
                 TvdbSynced = false,
                 PremiereDate = new DateTimeOffset(2001, 01, 01, 0, 0, 0, new TimeSpan(0)),
-                People = new[] {new ExtraPerson {Id = Guid.NewGuid().ToString(), Name = "Gimli", Type = PersonType.Actor}},
+                People = new[] { new ExtraPerson { Id = Guid.NewGuid().ToString(), Name = "Gimli", Type = PersonType.Actor } },
                 Genres = new[] { "Action" },
                 Episodes = new List<Episode>
                 {
-                    new EpisodeBuilder(1, id, "1").Build(),
-                    new EpisodeBuilder(2, id, "1").Build(),
+                    new EpisodeBuilder(Guid.NewGuid().ToString(), id, "1").Build(),
+                    new EpisodeBuilder(Guid.NewGuid().ToString(), id, "1").WithIndexNumber(1).Build(),
                 },
                 Seasons = new List<Season>
                 {
-                    new SeasonBuilder(1, id.ToString()).Build()
+                    new SeasonBuilder(Guid.NewGuid().ToString(), id).Build()
                 }
             };
         }
@@ -59,12 +63,6 @@ namespace Tests.Unit.Builders
             _show.Name = name;
             _show.SortName = "0001 - " + name;
             _show.Episodes.ForEach(x => x.ShowName = name);
-            return this;
-        }
-
-        public ShowBuilder AddMissingEpisodes(int count)
-        {
-            _show.MissingEpisodesCount = count;
             return this;
         }
 
@@ -119,14 +117,110 @@ namespace Tests.Unit.Builders
         public ShowBuilder AddActor(string id)
         {
             var list = _show.People.ToList();
-            list.Add(new ExtraPerson {Id = id, Name = "Gimli", Type = PersonType.Actor});
+            list.Add(new ExtraPerson { Id = id, Name = "Gimli", Type = PersonType.Actor });
             _show.People = list.ToArray();
+            return this;
+        }
+
+        public ShowBuilder AddPerson(ExtraPerson person)
+        {
+            var list = _show.People.ToList();
+            list.Add(person);
+            _show.People = list.ToArray();
+            return this;
+        }
+
+        public ShowBuilder ReplacePersons(ExtraPerson person)
+        {
+            _show.People = new[] { person };
+            return this;
+        }
+
+        public ShowBuilder AddMissingEpisodes(int count, int seasonIndex)
+        {
+            var season = _show.Seasons[seasonIndex];
+            for (var i = 0; i < count; i++)
+            {
+                _show.Episodes.Add(new EpisodeBuilder(Guid.NewGuid().ToString(), _show.Id, season.Id)
+                    .WithIndexNumber(i)
+                    .WithLocationType(LocationType.Virtual)
+                    .Build());
+            }
+
+            return this;
+        }
+
+        public ShowBuilder AddSeason(int indexNumber, int extraEpisodes)
+        {
+            var seasonId = Guid.NewGuid().ToString();
+            _show.Seasons.Add(new SeasonBuilder(seasonId, _show.Id).WithIndexNumber(indexNumber).Build());
+
+            for (var i = 0; i < extraEpisodes; i++)
+            {
+                _show.Episodes.Add(new EpisodeBuilder(Guid.NewGuid().ToString(), _show.Id, seasonId).Build());
+            }
+
+            return this;
+        }
+
+        public ShowBuilder AddFailedSync(bool state)
+        {
+            _show.TvdbFailed = state;
+            return this;
+        }
+
+        public ShowBuilder AddTvdbSynced(bool state)
+        {
+            _show.TvdbSynced = state;
+            return this;
+        }
+
+        public ShowBuilder AddUpdateState(DateTime updated)
+        {
+            _show.LastUpdated = updated;
             return this;
         }
 
         public Show Build()
         {
             return _show;
+        }
+
+        public BaseItemDto BuildBaseItemDto()
+        {
+            return new BaseItemDto
+            {
+                Id = _show.Id,
+                CommunityRating = _show.CommunityRating,
+                DateCreated = _show.DateCreated,
+                ParentId = _show.ParentId,
+                Path = _show.Path,
+                SortName = _show.SortName,
+                RunTimeTicks = _show.RunTimeTicks,
+                OfficialRating = _show.OfficialRating,
+                PremiereDate = _show.PremiereDate,
+                ProductionYear = _show.ProductionYear,
+                ImageTags = new Dictionary<ImageType, string>
+                {
+                    {ImageType.Primary, _show.Primary},
+                    {ImageType.Thumb, _show.Primary},
+                    {ImageType.Logo, _show.Primary},
+                    {ImageType.Banner, _show.Primary}
+                },
+                ProviderIds = new Dictionary<string, string>
+                {
+                    {"Imdb", _show.IMDB},
+                    {"Tmdb", _show.TMDB},
+                    {"Tvdb", _show.TVDB}
+                },
+                Genres = _show.Genres,
+                People = _show.People.Select(x => new BaseItemPerson
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    Type = x.Type
+                }).ToArray()
+            };
         }
     }
 }

@@ -12,45 +12,44 @@ using EmbyStat.Services.Interfaces;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using Tests.Unit.Builders.ViewModels;
 using Xunit;
 
 namespace Tests.Unit.Controllers
 {
-	[Collection("Mapper collection")]
-	public class SettingsControllerTests : IDisposable
+    public class SettingsControllerTests : IDisposable
     {
-	    private readonly SettingsController _subject;
-	    private readonly Mock<ISettingsService> _settingsServiceMock;
+        private readonly SettingsController _subject;
+        private readonly AppSettings _appSettings;
+        private readonly UserSettings _userSettings;
+        private readonly Mock<ISettingsService> _settingsServiceMock;
 
         private Guid DeviceId { get; set; }
 
-	    public SettingsControllerTests()
+        public SettingsControllerTests()
         {
             DeviceId = Guid.NewGuid();
-            var settings = new UserSettings
-			{
+            _userSettings = new UserSettings
+            {
                 Id = DeviceId,
                 AppName = "EmbyStat",
                 AutoUpdate = false,
                 KeepLogsCount = 10,
                 Language = "en-US",
-                MovieCollectionTypes = new List<CollectionType>() { CollectionType.Other, CollectionType.Movies, CollectionType.HomeVideos },
-                ShowCollectionTypes = new List<CollectionType>() { CollectionType.TvShow, CollectionType.Other },
+                MovieLibraries = new List<string>(),
+                ShowLibraries = new List<string>(),
                 ToShortMovie = 10,
                 UpdateInProgress = false,
                 UpdateTrain = UpdateTrain.Beta,
-                Username = "reggi",
                 WizardFinished = true,
-                Emby = new EmbySettings
+                MediaServer = new MediaServerSettings
                 {
-                    AccessToken = "1234567980",
-                    UserId = "aaaaaaaaaa",
+                    ApiKey = "1234567980",
                     ServerName = "ServerName",
                     AuthorizationScheme = "MediaBrowser",
                     ServerAddress = "localhost",
                     ServerPort = 8097,
                     ServerProtocol = ConnectionProtocol.Https,
-                    UserName = "admin"
                 },
                 Tvdb = new TvdbSettings
                 {
@@ -59,20 +58,26 @@ namespace Tests.Unit.Controllers
                 }
             };
 
-            _settingsServiceMock = new Mock<ISettingsService>();
-		    _settingsServiceMock.Setup(x => x.GetAppSettings()).Returns(new AppSettings { Version = "0.0.0.0" });
-		    _settingsServiceMock.Setup(x => x.GetUserSettings()).Returns(settings);
-            _settingsServiceMock.Setup(x => x.SaveUserSettingsAsync(It.IsAny<UserSettings>()))
-                .Returns(Task.FromResult(settings));
+            _appSettings = new AppSettings
+            {
+                Version = "0.0.0.0",
+                Dirs = new Dirs { Data = "data-dir", Logs = "log-dir", Config = "config-dir"}
+            };
 
-	        var mapperMock = new Mock<IMapper>();
+            _settingsServiceMock = new Mock<ISettingsService>();
+            _settingsServiceMock.Setup(x => x.GetAppSettings()).Returns(_appSettings);
+            _settingsServiceMock.Setup(x => x.GetUserSettings()).Returns(_userSettings);
+            _settingsServiceMock.Setup(x => x.SaveUserSettingsAsync(It.IsAny<UserSettings>()))
+                .Returns(Task.FromResult(_userSettings));
+
+            var mapperMock = new Mock<IMapper>();
             mapperMock.Setup(x => x.Map<FullSettingsViewModel>(It.IsAny<UserSettings>()))
-                .Returns(new FullSettingsViewModel());
+                .Returns(new FullSettingsViewModelBuilder(_userSettings).Build);
             mapperMock.Setup(x => x.Map<UserSettings>(It.IsAny<FullSettingsViewModel>()))
-                .Returns(new UserSettings()
+                .Returns(new UserSettings
                 {
-                    MovieCollectionTypes = new List<CollectionType>(),
-                    ShowCollectionTypes = new List<CollectionType>()
+                    MovieLibraries = new List<string>(),
+                    ShowLibraries = new List<string>()
                 });
 
             var statisticsRepositoryMock = new Mock<IStatisticsRepository>();
@@ -80,51 +85,86 @@ namespace Tests.Unit.Controllers
             statisticsRepositoryMock.Setup(x => x.MarkShowTypesAsInvalid());
 
             var languageServiceMock = new Mock<ILanguageService>();
+            languageServiceMock.Setup(x => x.GetLanguages()).Returns(new List<Language>
+            {
+                new Language {Code = "BE", Id = "1", Name = "Dutch"},
+                new Language {Code = "EN", Id = "2", Name = "English"}
+            });
 
-            _subject = new SettingsController(_settingsServiceMock.Object, statisticsRepositoryMock.Object, languageServiceMock.Object, mapperMock.Object);
-		}
+            var mediaServerServiceMock = new Mock<IMediaServerService>();
 
-	    public void Dispose()
-	    {
-		    _subject?.Dispose();
-		}
+            _subject = new SettingsController(_settingsServiceMock.Object, statisticsRepositoryMock.Object, languageServiceMock.Object, mapperMock.Object, mediaServerServiceMock.Object);
+        }
 
-		[Fact]
-	    public void IsConfigurationLoaded()
-	    {
-		    var result = _subject.Get();
+        public void Dispose()
+        {
+            _subject?.Dispose();
+        }
 
-		    result.Should().BeOfType<OkObjectResult>();
-		    _settingsServiceMock.Verify(x => x.GetUserSettings(), Times.Once);
-	    }
+        [Fact]
+        public void IsConfigurationLoaded()
+        {
+            var result = _subject.Get();
 
-	    [Fact]
-	    public async void IsConfigurationUpdatedCorrectly()
-	    {
-		    var settings = new FullSettingsViewModel
-		    {
+            result.Should().BeOfType<OkObjectResult>();
+            var resultObject = result.Should().BeOfType<OkObjectResult>().Subject.Value;
+            var settings = resultObject.Should().BeOfType<FullSettingsViewModel>().Subject;
+
+            settings.AppName.Should().Be(_userSettings.AppName);
+            settings.AutoUpdate.Should().Be(_userSettings.AutoUpdate);
+            settings.EnableRollbarLogging.Should().Be(_userSettings.EnableRollbarLogging);
+            settings.Id.Should().Be(_userSettings.Id);
+            settings.KeepLogsCount.Should().Be(_userSettings.KeepLogsCount);
+            settings.Language.Should().Be(_userSettings.Language);
+            settings.NoUpdates.Should().Be(_appSettings.NoUpdates);
+            settings.ToShortMovie.Should().Be(_userSettings.ToShortMovie);
+            settings.ToShortMovieEnabled.Should().Be(_userSettings.ToShortMovieEnabled);
+            settings.UpdateInProgress.Should().Be(_userSettings.UpdateInProgress);
+            settings.UpdateTrain.Should().Be((int)_userSettings.UpdateTrain);
+            settings.WizardFinished.Should().Be(_userSettings.WizardFinished);
+            settings.MovieLibraries.Count.Should().Be(_userSettings.MovieLibraries.Count);
+            settings.ShowLibraries.Count.Should().Be(_userSettings.ShowLibraries.Count);
+            settings.MediaServer.ApiKey.Should().Be(_userSettings.MediaServer.ApiKey);
+            settings.MediaServer.AuthorizationScheme.Should().Be(_userSettings.MediaServer.AuthorizationScheme);
+            settings.MediaServer.ServerAddress.Should().Be(_userSettings.MediaServer.ServerAddress);
+            settings.MediaServer.ServerName.Should().Be(_userSettings.MediaServer.ServerName);
+            settings.MediaServer.ServerPort.Should().Be(_userSettings.MediaServer.ServerPort);
+            settings.MediaServer.ServerProtocol.Should().Be((int)_userSettings.MediaServer.ServerProtocol);
+
+
+            settings.DataDir.Should().Be(_appSettings.Dirs.Data);
+            settings.LogDir.Should().Be(_appSettings.Dirs.Logs);
+            settings.ConfigDir.Should().Be(_appSettings.Dirs.Config);
+            settings.Version.Should().Be(_appSettings.Version);
+
+            _settingsServiceMock.Verify(x => x.GetUserSettings(), Times.Once);
+        }
+
+        [Fact]
+        public async void IsConfigurationUpdatedCorrectly()
+        {
+            var settings = new FullSettingsViewModel
+            {
                 Id = DeviceId,
                 AppName = "EmbyStat",
                 AutoUpdate = false,
                 KeepLogsCount = 10,
                 Language = "en-US",
-                MovieCollectionTypes = new List<int> { 0, 2, 6 },
-                ShowCollectionTypes = new List<int> { 0, 2 },
+                MovieLibraries = new List<string>(),
+                ShowLibraries = new List<string>(),
                 ToShortMovie = 10,
                 UpdateInProgress = false,
                 UpdateTrain = 0,
                 Username = "reggi",
                 WizardFinished = true,
-                Emby = new FullSettingsViewModel.EmbySettingsViewModel
+                MediaServer = new FullSettingsViewModel.MediaServerSettingsViewModel
                 {
-                    AccessToken = "1234567980",
-                    UserId = "aaaaaaaaaa",
+                    ApiKey = "1234567980",
                     ServerName = "ServerName",
                     AuthorizationScheme = "MediaBrowser",
                     ServerAddress = "localhost",
                     ServerPort = 8097,
                     ServerProtocol = 1,
-                    UserName = "admin"
                 },
                 Tvdb = new FullSettingsViewModel.TvdbSettingsViewModel
                 {
@@ -133,9 +173,16 @@ namespace Tests.Unit.Controllers
                 }
             };
 
-		    await _subject.Update(settings);
+            await _subject.Update(settings);
 
-		    _settingsServiceMock.Verify(x => x.SaveUserSettingsAsync(It.IsAny<UserSettings>()), Times.Once);
-	    }
-	}
+            _settingsServiceMock.Verify(x => x.SaveUserSettingsAsync(It.IsAny<UserSettings>()), Times.Once);
+        }
+
+        [Fact]
+        public void GetLanguages_Should_Return_All_Languages()
+        {
+            var result = _subject.GetList();
+            result.Should().BeOfType<OkObjectResult>();
+        }
+    }
 }

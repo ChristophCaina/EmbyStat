@@ -1,17 +1,19 @@
 ﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+using EmbyStat.Common.Helpers;
 using EmbyStat.Common.Models.Entities;
 using EmbyStat.Services.Models.Show;
-using EmbyStat.Services.Models.Stat;
 
 namespace EmbyStat.Services.Interfaces
 {
     public interface IShowService
     {
-        IEnumerable<Collection> GetShowCollections();
-        Task<ShowStatistics> GetStatistics(List<string> collectionIds);
-        List<ShowCollectionRow> GetCollectionRows(List<string> collectionIds);
-        Task<ShowStatistics> CalculateShowStatistics(List<string> collectionIds);
+        IEnumerable<Library> GetShowLibraries();
+        ShowStatistics GetStatistics(List<string> libraryIds);
+        ShowStatistics CalculateShowStatistics(List<string> libraryIds);
+        ShowStatistics CalculateShowStatistics(string libraryId);
+        ListContainer<ShowCollectionRow> GetCollectedRows(List<string> libraryIds, int page);
+        List<ShowCollectionRow> CalculateCollectedRows(List<string> libraryIds);
+        List<ShowCollectionRow> CalculateCollectedRows(string libraryId);
         bool TypeIsPresent();
     }
 }

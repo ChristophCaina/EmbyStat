@@ -2,27 +2,28 @@
 using System.IO;
 using System.Linq;
 using EmbyStat.Common.Extensions;
-using EmbyStat.Common.Models.Settings;
 using EmbyStat.Services.Interfaces;
 using EmbyStat.Services.Models.Logs;
-using Microsoft.Extensions.Options;
 
 namespace EmbyStat.Services
 {
     public class LogService : ILogService
     {
         private readonly ISettingsService _settingsService;
+        private readonly IMediaServerService _mediaServerService;
 
-        public LogService(ISettingsService settingsService)
+        public LogService(ISettingsService settingsService, IMediaServerService mediaServerService)
         {
             _settingsService = settingsService;
+            _mediaServerService = mediaServerService;
         }
 
         public List<LogFile> GetLogFileList()
         {
             var settings = _settingsService.GetUserSettings();
             var list = new List<LogFile>();
-            foreach (var filePath in Directory.EnumerateFiles(_settingsService.GetAppSettings().Dirs.Logs.GetLocalPath()))
+            var dirs = _settingsService.GetAppSettings().Dirs;
+            foreach (var filePath in Directory.EnumerateFiles(Path.Combine(dirs.Config, dirs.Logs).GetLocalPath()))
             {
                 var file = new FileInfo(filePath);
                 list.Add(new LogFile
@@ -35,27 +36,32 @@ namespace EmbyStat.Services
             return list.OrderByDescending(x => x.CreatedDate).Take(settings.KeepLogsCount).ToList();
         }
 
-        public Stream GetLogStream(string fileName, bool anonymous)
+        public MemoryStream GetLogStream(string fileName, bool anonymous)
         {
-            var logDir = _settingsService.GetAppSettings().Dirs.Logs;
-            var logStream = new FileStream(Path.Combine(Directory.GetCurrentDirectory(), logDir, fileName), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-
-            if (!anonymous)
-            {
-                return logStream;
-            }
+            var dirs = _settingsService.GetAppSettings().Dirs;
+            var logStream = new FileStream(Path.Combine(dirs.Config, dirs.Logs, fileName).GetLocalPath(), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
             var newLogStream = new MemoryStream();
+            if (!anonymous)
+            {
+                logStream.CopyTo(newLogStream);
+                return newLogStream;
+            }
+
             using (var reader = new StreamReader(logStream))
             {
                 var writer = new StreamWriter(newLogStream);
                 var configuration = _settingsService.GetUserSettings();
+                var serverInfo = _mediaServerService.GetServerInfo(false);
+
                 string line;
                 while ((line = reader.ReadLine()) != null)
                 {
-                    line = line.Replace(configuration.FullEmbyServerAddress, "http://xxx.xxx.xxx.xxx:xxxx");
+                    line = line.Replace(configuration.MediaServer.FullMediaServerAddress, "http://xxx.xxx.xxx.xxx:xxxx");
+                    line = line.Replace(configuration.MediaServer.FullSocketAddress, "wss://xxx.xxx.xxx.xxx:xxxx");
                     line = line.Replace(configuration.Tvdb.ApiKey, "xxxxxxxxxxxxxx");
-                    line = line.Replace(configuration.Emby.UserName, "{EMBY ADMIN USER}");
+                    line = line.Replace(configuration.MediaServer.ApiKey, "xxxxxxxxxxxxxx");
+                    line = line.Replace(serverInfo.Id, "xxxxxxxxxxxxxx");
                     writer.WriteLine(line);
                 }
 

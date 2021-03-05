@@ -3,14 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using EmbyStat.Common.Enums;
 using EmbyStat.Common.Models;
-using EmbyStat.Common.Models.Entities;
 using EmbyStat.Common.Models.Settings;
 using EmbyStat.Services.Interfaces;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using NLog;
 using Rollbar;
 using Formatting = Newtonsoft.Json.Formatting;
 
@@ -44,11 +41,16 @@ namespace EmbyStat.Services
 
         public async Task<UserSettings> SaveUserSettingsAsync(UserSettings userSettings, long version)
         {
+            if (userSettings.MediaServer.ServerBaseUrl == "/")
+            {
+                userSettings.MediaServer.ServerBaseUrl = "";
+            }
+
             _userSettings = userSettings;
             _userSettings.Version = version;
 
             var strJson = JsonConvert.SerializeObject(_userSettings, Formatting.Indented);
-            var dir = Path.Combine(_appSettings.Dirs.Settings, "usersettings.json");
+            var dir = Path.Combine(_appSettings.Dirs.Config, "usersettings.json");
             await File.WriteAllTextAsync(dir, strJson);
 
             CreateRollbarLogger();
@@ -92,7 +94,7 @@ namespace EmbyStat.Services
 
         public void LoadUserSettingsFromFile()
         {
-            var dir = Path.Combine(_appSettings.Dirs.Settings, "usersettings.json");
+            var dir = Path.Combine(_appSettings.Dirs.Config, "usersettings.json");
             if (File.Exists(dir))
             {
                 _userSettings = JsonConvert.DeserializeObject<UserSettings>(File.ReadAllText(dir));

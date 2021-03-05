@@ -1,26 +1,22 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using EmbyStat.Common.Models.Entities;
+using EmbyStat.Repositories.Interfaces.Helpers;
 
 namespace EmbyStat.Repositories.Interfaces
 {
-    public interface IShowRepository
+    public interface IShowRepository : IMediaRepository<Show>
     {
-        void RemoveShows();
-        void UpdateShow(Show show);
-        void InsertShowsBulk(IEnumerable<Show> list);
-        void InsertSeasonsBulk(IEnumerable<Season> seasons);
-        void InsertEpisodesBulk(IEnumerable<Episode> episodes);
-        IEnumerable<Show> GetAllShowsWithTvdbId();
-        IEnumerable<Episode> GetAllEpisodesForShow(int showId);
-        int GetEpisodeCountForShow(int showId);
-        int GetEpisodeCountForShow(int showId, bool includeSpecials);
-        int GetSeasonCountForShow(int showId);
-        int GetSeasonCountForShow(int showId, bool includeSpecials);
-        bool AnyShows();
-        Episode GetEpisodeById(string id);
-        IEnumerable<Show> GetAllShows(IReadOnlyList<string> collectionIds);
-        IEnumerable<Show> GetAllShows(IReadOnlyList<string> collectionIds, bool includeSeasons, bool includeEpisodes);
+        void InsertShow(Show show);
+        List<Show> GetAllShows(IReadOnlyList<string> libraryIds, bool includeSeasons, bool includeEpisodes);
+        Episode GetEpisodeById(string showId, string id);
         Season GetSeasonById(string id);
-        int GetShowCountForPerson(string personId);
+        List<Episode> GetAllEpisodesForShow(string showId);
+        Show GetShowById(string showId);
+        void RemoveShowsThatAreNotUpdated(DateTime startTime);
+        void AddSeason(Season season);
+        void AddEpisode(Episode episode);
+        void RemoveShows();
+        Dictionary<Show, int> GetShowsWithMostEpisodes(IReadOnlyList<string> libraryIds, int count);
     }
 }

@@ -1,210 +1,302 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Threading.Tasks;
 using EmbyStat.Common;
 using EmbyStat.Common.Enums;
 using EmbyStat.Common.Extensions;
+using EmbyStat.Common.Helpers;
 using EmbyStat.Common.Models.Entities;
+using EmbyStat.Common.Models.Show;
 using EmbyStat.Repositories.Interfaces;
 using EmbyStat.Services.Abstract;
 using EmbyStat.Services.Converters;
 using EmbyStat.Services.Interfaces;
+using EmbyStat.Services.Models.Cards;
 using EmbyStat.Services.Models.Charts;
 using EmbyStat.Services.Models.Show;
 using EmbyStat.Services.Models.Stat;
-using MediaBrowser.Model.Entities;
-using MediaBrowser.Model.Extensions;
 using Newtonsoft.Json;
+using LocationType = EmbyStat.Common.Enums.LocationType;
 
 namespace EmbyStat.Services
 {
     public class ShowService : MediaService, IShowService
     {
         private readonly IShowRepository _showRepository;
-        private readonly ICollectionRepository _collectionRepository;
-        private readonly IPersonService _personService;
+        private readonly ILibraryRepository _libraryRepository;
         private readonly IStatisticsRepository _statisticsRepository;
         private readonly ISettingsService _settingsService;
 
-        public ShowService(IJobRepository jobRepository, IShowRepository showRepository, ICollectionRepository collectionRepository,
-            IPersonService personService, IStatisticsRepository statisticsRepository, ISettingsService settingsService) : base(jobRepository)
+        public ShowService(IJobRepository jobRepository, IShowRepository showRepository, ILibraryRepository libraryRepository,
+            IPersonService personService, IStatisticsRepository statisticsRepository, ISettingsService settingsService) : base(jobRepository, personService)
         {
             _showRepository = showRepository;
-            _collectionRepository = collectionRepository;
-            _personService = personService;
+            _libraryRepository = libraryRepository;
             _statisticsRepository = statisticsRepository;
             _settingsService = settingsService;
         }
 
-        public IEnumerable<Collection> GetShowCollections()
+        public IEnumerable<Library> GetShowLibraries()
         {
             var settings = _settingsService.GetUserSettings();
-            return _collectionRepository.GetCollectionByTypes(settings.ShowCollectionTypes);
+            return _libraryRepository.GetLibrariesById(settings.ShowLibraries);
         }
 
-        public async Task<ShowStatistics> GetStatistics(List<string> collectionIds)
+        public ShowStatistics GetStatistics(List<string> libraryIds)
         {
-            var statistic = _statisticsRepository.GetLastResultByType(StatisticType.Show, collectionIds);
+            var statistic = _statisticsRepository.GetLastResultByType(StatisticType.Show, libraryIds);
 
-            ShowStatistics statistics;
-            if (StatisticsAreValid(statistic, collectionIds))
+            if (StatisticsAreValid(statistic, libraryIds))
             {
-                statistics = JsonConvert.DeserializeObject<ShowStatistics>(statistic.JsonResult);
-            }
-            else
-            {
-                statistics = await CalculateShowStatistics(collectionIds);
+                return JsonConvert.DeserializeObject<ShowStatistics>(statistic.JsonResult);
             }
 
-            return statistics;
+            return CalculateShowStatistics(libraryIds);
         }
 
-        public async Task<ShowStatistics> CalculateShowStatistics(List<string> collectionIds)
+        public ShowStatistics CalculateShowStatistics(string libraryId)
         {
-            var shows = _showRepository.GetAllShows(collectionIds).ToList();
+            return CalculateShowStatistics(new List<string> { libraryId });
+        }
+
+        public ShowStatistics CalculateShowStatistics(List<string> libraryIds)
+        {
+            var shows = _showRepository.GetAllShows(libraryIds, true, true);
+
             var statistics = new ShowStatistics
             {
-                General = CalculateGeneralStatistics(shows),
-                Charts = CalculateCharts(shows),
-                People = await CalculatePeopleStatistics(shows)
+                Cards = CalculateCards(libraryIds),
+                TopCards = CalculateTopCards(libraryIds),
+                People = CalculatePeopleStatistics(libraryIds),
+                BarCharts = CalculateBarCharts(shows),
+                PieCharts = CalculatePieChars(shows)
             };
 
             var json = JsonConvert.SerializeObject(statistics);
-            _statisticsRepository.AddStatistic(json, DateTime.UtcNow, StatisticType.Show, collectionIds);
+            _statisticsRepository.AddStatistic(json, DateTime.UtcNow, StatisticType.Show, libraryIds);
 
             return statistics;
-        }
-
-        private ShowGeneral CalculateGeneralStatistics(IReadOnlyList<Show> shows)
-        {
-            return new ShowGeneral
-            {
-                ShowCount = TotalShowCount(shows),
-                EpisodeCount = TotalEpisodeCount(shows),
-                MissingEpisodeCount = TotalMissingEpisodeCount(shows),
-                TotalPlayableTime = CalculatePlayableTime(shows),
-                HighestRatedShow = CalculateHighestRatedShow(shows),
-                LowestRatedShow = CalculateLowestRatedShow(shows),
-                OldestPremieredShow = CalculateOldestPremieredShow(shows),
-                ShowWithMostEpisodes = CalculateShowWithMostEpisodes(shows),
-                YoungestAddedShow = CalculateYoungestAddedShow(shows),
-                YoungestPremieredShow = CalculateYoungestPremieredShow(shows)
-            };
-        }
-
-        private ShowCharts CalculateCharts(IReadOnlyList<Show> shows)
-        {
-            var stats = new ShowCharts();
-            stats.BarCharts.Add(CalculateGenreChart(shows));
-            stats.BarCharts.Add(CalculateRatingChart(shows.Select(x => x.CommunityRating)));
-            stats.BarCharts.Add(CalculatePremiereYearChart(shows.Select(x => x.PremiereDate)));
-            stats.BarCharts.Add(CalculateCollectedRateChart(shows));
-            stats.PieCharts.Add(CalculateOfficialRatingChart(shows));
-            stats.PieCharts.Add(CalculateShowStateChart(shows));
-
-            return stats;
-        }
-
-        private async Task<PersonStats> CalculatePeopleStatistics(IReadOnlyList<Show> shows)
-        {
-            return new PersonStats
-            {
-                MostFeaturedActorsPerGenre = await GetMostFeaturedActorsPerGenreAsync(shows)
-            };
-        }
-
-        public List<ShowCollectionRow> GetCollectionRows(List<string> collectionIds)
-        {
-            var statistic = _statisticsRepository.GetLastResultByType(StatisticType.ShowCollectedRows, collectionIds);
-
-            List<ShowCollectionRow> stats;
-            if (StatisticsAreValid(statistic, collectionIds))
-            {
-                stats = JsonConvert.DeserializeObject<List<ShowCollectionRow>>(statistic.JsonResult);
-            }
-            else
-            {
-                var shows = _showRepository.GetAllShows(collectionIds);
-
-                stats = shows.Select(CreateShowCollectionRow).ToList();
-
-                var json = JsonConvert.SerializeObject(stats);
-                _statisticsRepository.AddStatistic(json, DateTime.UtcNow, StatisticType.ShowCollectedRows, collectionIds);
-            }
-
-            return stats;
-        }
-
-        private ShowCollectionRow CreateShowCollectionRow(Show show)
-        {
-            //TODO: gewoon in show nazien ipv naar DB gaat! indexnr is ook fout, moet naar season gaan
-            var episodeCount = _showRepository.GetEpisodeCountForShow(show.Id);
-            var totalEpisodeCount = _showRepository.GetEpisodeCountForShow(show.Id, true);
-            var specialCount = totalEpisodeCount - episodeCount;
-            var seasonCount = _showRepository.GetSeasonCountForShow(show.Id);
-
-            return new ShowCollectionRow
-            {
-                Title = show.Name,
-                SortName = show.SortName,
-                Episodes = episodeCount,
-                Seasons = seasonCount,
-                Specials = specialCount,
-                MissingEpisodes = show.MissingEpisodesCount,
-                PremiereDate = show.PremiereDate,
-                Status = show.Status == "Continuing"
-            };
         }
 
         public bool TypeIsPresent()
         {
-            return _showRepository.AnyShows();
+            return _showRepository.Any();
         }
 
-        private async Task<List<PersonPoster>> GetMostFeaturedActorsPerGenreAsync(IReadOnlyList<Show> shows)
+        #region Cards
+
+        private List<Card<string>> CalculateCards(IReadOnlyList<string> libraryIds)
         {
-            var list = new List<PersonPoster>();
-            var genres = shows.SelectMany(x => x.Genres).Distinct();
-
-            foreach (var genre in genres.OrderBy(x => x))
+            return new List<Card<string>>
             {
-                var selectedShows = shows.Where(x => x.Genres.Any(y => y == genre));
+                CalculateTotalShowCount(libraryIds),
+                CalculateTotalEpisodeCount(libraryIds),
+                CalculateTotalMissingEpisodeCount(libraryIds),
+                CalculatePlayableTime(libraryIds),
+                CalculateTotalShowGenres(libraryIds),
+                CalculateTotalDiskSize(libraryIds)
+            };
+        }
 
-                var personName = selectedShows
-                    .SelectMany(x => x.People)
-                    .Where(x => x.Type == PersonType.Actor)
-                    .GroupBy(x => x.Name, (name, people) => new { Name = name, Count = people.Count() })
-                    .OrderByDescending(x => x.Count)
-                    .Select(x => x.Name)
-                    .FirstOrDefault();
+        private Card<string> CalculateTotalShowCount(IReadOnlyList<string> libraryIds)
+        {
+            var count = _showRepository
+                .GetMediaCount(libraryIds)
+                .ToString();
 
-                if (personName != null)
-                {
-                    var person = await _personService.GetPersonByNameAsync(personName);
-                    if (person != null)
-                    {
-                        list.Add(PosterHelper.ConvertToPersonPoster(person, genre));
-                    }
-                }
-            }
+            return new Card<string>
+            {
+                Title = Constants.Shows.TotalShows,
+                Value = count,
+                Type = CardType.Text,
+                Icon = Constants.Icons.TheatersRoundedIcon
+            };
+        }
 
-            return list;
+        private Card<string> CalculateTotalEpisodeCount(IReadOnlyList<string> libraryIds)
+        {
+            var sum = _showRepository
+                .GetAllShows(libraryIds, true, true)
+                .Sum(x => x.GetNonSpecialEpisodeCount(false))
+                .ToString();
+
+            return new Card<string>
+            {
+                Title = Constants.Shows.TotalEpisodes,
+                Value = sum,
+                Type = CardType.Text,
+                Icon = Constants.Icons.TheatersRoundedIcon
+            };
+        }
+
+        private Card<string> CalculateTotalShowGenres(IReadOnlyList<string> libraryIds)
+        {
+            var totalGenres = _showRepository.GetGenreCount(libraryIds);
+            return new Card<string>
+            {
+                Title = Constants.Common.TotalGenres,
+                Value = totalGenres.ToString(),
+                Type = CardType.Text,
+                Icon = Constants.Icons.PoundRoundedIcon
+            };
+        }
+
+        private Card<string> CalculateTotalMissingEpisodeCount(IReadOnlyList<string> libraryIds)
+        {
+            var sum = _showRepository
+                .GetAllShows(libraryIds, false, true)
+                .Sum(x => x.MissingEpisodesCount)
+                .ToString();
+
+            return new Card<string>
+            {
+                Title = Constants.Shows.TotalMissingEpisodes,
+                Value = sum,
+                Type = CardType.Text,
+                Icon = Constants.Icons.TheatersRoundedIcon
+            };
+        }
+
+        private Card<string> CalculatePlayableTime(IReadOnlyList<string> libraryIds)
+        {
+            var shows = _showRepository.GetAllShows(libraryIds, false, false);
+            var playLength = new TimeSpan(shows.Sum(x => x.CumulativeRunTimeTicks ?? 0));
+
+            return new Card<string>
+            {
+                Title = Constants.Shows.TotalPlayLength,
+                Value = $"{playLength.Days}|{playLength.Hours}|{playLength.Minutes}",
+                Type = CardType.Time,
+                Icon = Constants.Icons.QueryBuilderRoundedIcon
+            };
+        }
+
+        private Card<string> CalculateTotalDiskSize(IReadOnlyList<string> libraryIds)
+        {
+            var sum = _showRepository
+                .GetAllShows(libraryIds, false, true)
+                .SelectMany(x => x.Episodes)
+                .Where(x => x.LocationType == LocationType.Disk)
+                .Sum(x => x.MediaSources.FirstOrDefault()?.SizeInMb ?? 0);
+
+            return new Card<string>
+            {
+                Value = sum.ToString(CultureInfo.InvariantCulture),
+                Title = Constants.Common.TotalDiskSize,
+                Type = CardType.Size,
+                Icon = Constants.Icons.StorageRoundedIcon
+            };
+        }
+
+        #endregion
+
+        #region TopCards
+
+        private List<TopCard> CalculateTopCards(IReadOnlyList<string> libraryIds)
+        {
+            return new List<TopCard>
+            {
+                CalculateNewestPremieredShow(libraryIds),
+                CalculateOldestPremieredShow(libraryIds),
+                CalculateLatestAddedShow(libraryIds),
+                CalculateHighestRatedShow(libraryIds),
+                CalculateLowestRatedShow(libraryIds),
+                CalculateShowWithMostEpisodes(libraryIds)
+            };
+        }
+
+        private TopCard CalculateNewestPremieredShow(IReadOnlyList<string> libraryIds)
+        {
+            var list = _showRepository.GetNewestPremieredMedia(libraryIds, 5).ToArray();
+
+            return list.Length > 0
+                ? list.ConvertToTopCard(Constants.Shows.NewestPremiered, "COMMON.DATE", "PremiereDate", ValueTypeEnum.Date)
+                : null;
+        }
+
+        private TopCard CalculateOldestPremieredShow(IReadOnlyList<string> libraryIds)
+        {
+            var list = _showRepository.GetOldestPremieredMedia(libraryIds, 5).ToArray();
+
+            return list.Length > 0
+                ? list.ConvertToTopCard(Constants.Shows.OldestPremiered, "COMMON.DATE", "PremiereDate", ValueTypeEnum.Date)
+                : null;
+        }
+
+        private TopCard CalculateLatestAddedShow(IReadOnlyList<string> libraryIds)
+        {
+            var list = _showRepository.GetLatestAddedMedia(libraryIds, 5).ToArray();
+
+            return list.Length > 0
+                ? list.ConvertToTopCard(Constants.Shows.LatestAdded, "COMMON.DATE", "DateCreated", ValueTypeEnum.Date)
+                : null;
+        }
+
+        private TopCard CalculateHighestRatedShow(IReadOnlyList<string> libraryIds)
+        {
+            var list = _showRepository.GetHighestRatedMedia(libraryIds, 5).ToArray();
+
+            return list.Length > 0
+                ? list.ConvertToTopCard(Constants.Shows.HighestRatedShow, "/10", "CommunityRating", false)
+                : null;
+        }
+
+        private TopCard CalculateLowestRatedShow(IReadOnlyList<string> libraryIds)
+        {
+            var list = _showRepository.GetLowestRatedMedia(libraryIds, 5).ToArray();
+
+            return list.Length > 0
+                ? list.ConvertToTopCard(Constants.Shows.LowestRatedShow, "/10", "CommunityRating", false)
+                : null;
+        }
+
+        private TopCard CalculateShowWithMostEpisodes(IReadOnlyList<string> libraryIds)
+        {
+            var list = _showRepository.GetShowsWithMostEpisodes(libraryIds, 5);
+
+            return list.Count > 0
+                ? list.ConvertToTopCard(Constants.Shows.MostEpisodes, "#")
+                : null;
+        }
+
+        #endregion
+
+        #region Charts
+
+        private List<Chart> CalculateBarCharts(IReadOnlyList<Show> shows)
+        {
+            return new List<Chart>
+            {
+                CalculateGenreChart(shows),
+                CalculateRatingChart(shows.Select(x => x.CommunityRating)),
+                CalculatePremiereYearChart(shows.Select(x => x.PremiereDate)),
+                CalculateCollectedRateChart(shows)
+            };
+        }
+
+        private List<Chart> CalculatePieChars(IReadOnlyList<Show> shows)
+        {
+            return new List<Chart>
+            {
+                CalculateOfficialRatingChart(shows),
+                CalculateShowStateChart(shows)
+            };
         }
 
         private Chart CalculateShowStateChart(IReadOnlyList<Show> shows)
         {
             var list = shows
                 .GroupBy(x => x.Status)
-                .Select(x => new { Name = x.Key, Count = x.Count() })
-                .OrderBy(x => x.Name)
+                .Select(x => new { Label = x.Key, Val0 = x.Count() })
+                .OrderByDescending(x => x.Val0)
                 .ToList();
 
             return new Chart
             {
                 Title = Constants.Shows.ShowStatusChart,
-                Labels = list.Select(x => x.Name),
-                DataSets = new List<IEnumerable<int>> { list.Select(x => x.Count) }
+                DataSets = JsonConvert.SerializeObject(list),
+                SeriesCount = 1
 
             };
         }
@@ -214,15 +306,15 @@ namespace EmbyStat.Services
             var ratingData = shows
                 .Where(x => !string.IsNullOrWhiteSpace(x.OfficialRating))
                 .GroupBy(x => x.OfficialRating.ToUpper())
-                .Select(x => new { Name = x.Key, Count = x.Count() })
-                .OrderBy(x => x.Name)
+                .Select(x => new { Label = x.Key, Val0 = x.Count() })
+                .OrderByDescending(x => x.Val0)
                 .ToList();
 
             return new Chart
             {
                 Title = Constants.CountPerOfficialRating,
-                Labels = ratingData.Select(x => x.Name),
-                DataSets = new List<IEnumerable<int>> { ratingData.Select(x => x.Count) }
+                DataSets = JsonConvert.SerializeObject(ratingData),
+                SeriesCount = 1
             };
         }
 
@@ -231,204 +323,148 @@ namespace EmbyStat.Services
             var percentageList = new List<double>();
             foreach (var show in shows)
             {
-                var episodeCount = _showRepository.GetEpisodeCountForShow(show.Id);
-                if (episodeCount + show.MissingEpisodesCount == 0)
+                var specialSeasonId = show.Seasons.FirstOrDefault(x => x.IndexNumber == 0)?.Id.ToString() ?? "0";
+                var episodeCount = show.Episodes.Count(x => x.LocationType == LocationType.Disk && x.ParentId != specialSeasonId);
+                var missingEpisodeCount = show.Episodes.Count(x => x.LocationType == LocationType.Virtual && x.ParentId != specialSeasonId);
+
+                if (episodeCount + missingEpisodeCount == 0)
                 {
                     percentageList.Add(0);
                 }
                 else
                 {
-                    percentageList.Add((double)episodeCount / (episodeCount + show.MissingEpisodesCount));
+                    percentageList.Add((double)episodeCount / (episodeCount + missingEpisodeCount));
                 }
             }
 
             var groupedList = percentageList
                 .GroupBy(x => x.RoundToFive())
-                .OrderBy(x => x.Key)
                 .ToList();
 
-            if (percentageList.Any())
+            for (var i = 0; i < 20; i++)
             {
-                var j = 0;
-                for (var i = 0; i < 20; i++)
+                if (groupedList.All(x => x.Key != i * 5))
                 {
-                    if (groupedList[j].Key != i * 5)
-                    {
-                        groupedList.Add(new ChartGrouping<int?, double> { Key = i * 5, Capacity = 0 });
-                    }
-                    else
-                    {
-                        j++;
-                    }
+                    groupedList.Add(new ChartGrouping<int?, double> { Key = i * 5, Capacity = 0 });
                 }
             }
 
             var rates = groupedList
+                .Where(x => x.Key != 100)
                 .OrderBy(x => x.Key)
-                .Select(x => new { Name = x.Key != 100 ? $"{x.Key}% - {x.Key + 4}%" : $"{x.Key}%", Count = x.Count() })
-                .Select(x => new { x.Name, x.Count })
+                .Select(x => new { Label = x.Key != 100 ? $"{x.Key}% - {x.Key + 4}%" : $"{x.Key}%", Val0 = x.Count() })
+                .Select(x => new { x.Label, x.Val0 })
                 .ToList();
 
             return new Chart
             {
-                Title = Constants.CountPerCollectedRate,
-                Labels = rates.Select(x => x.Name),
-                DataSets = new List<IEnumerable<int>> { rates.Select(x => x.Count) }
+                Title = Constants.CountPerCollectedPercentage,
+                DataSets = JsonConvert.SerializeObject(rates),
+                SeriesCount = 1
             };
         }
 
-        private Chart CalculateGenreChart(IReadOnlyList<Show> shows)
+        #endregion
+
+        #region People
+
+        public PersonStats CalculatePeopleStatistics(IReadOnlyList<string> libraryIds)
         {
-            var genresData = shows
-                .SelectMany(x => x.Genres)
-                .GroupBy(x => x)
-                .Select(x => new { Name = x.Key, Count = x.Count() })
-                .OrderBy(x => x.Name)
-                .ToList();
-
-            return new Chart
+            var returnObj = new PersonStats();
+            try
             {
-                Title = Constants.CountPerGenre,
-                Labels = genresData.Select(x => x.Name),
-                DataSets = new List<IEnumerable<int>> { genresData.Select(x => x.Count) }
-            };
-        }
-
-        private ShowPoster CalculateYoungestPremieredShow(IReadOnlyList<Show> shows)
-        {
-            var yougest = shows
-                .Where(x => x.PremiereDate.HasValue)
-                .OrderByDescending(x => x.PremiereDate)
-                .FirstOrDefault();
-
-            if (yougest != null)
-            {
-                return PosterHelper.ConvertToShowPoster(yougest, Constants.Shows.YoungestPremiered);
-            }
-
-            return new ShowPoster();
-        }
-
-        private ShowPoster CalculateYoungestAddedShow(IReadOnlyList<Show> shows)
-        {
-            var yougest = shows
-                .Where(x => x.DateCreated.HasValue)
-                .OrderByDescending(x => x.DateCreated)
-                .FirstOrDefault();
-
-            if (yougest != null)
-            {
-                return PosterHelper.ConvertToShowPoster(yougest, Constants.Shows.YoungestAdded);
-            }
-
-            return new ShowPoster();
-        }
-
-        private ShowPoster CalculateShowWithMostEpisodes(IReadOnlyList<Show> shows)
-        {
-            var total = 0;
-            Show resultShow = null;
-            foreach (var show in shows)
-            {
-                var episodes = _showRepository.GetAllEpisodesForShow(show.Id).ToArray();
-                if (episodes.Length > total)
+                returnObj.Cards = new List<Card<string>>
                 {
-                    total = episodes.Length;
-                    resultShow = show;
-                }
-            }
+                    TotalTypeCount(libraryIds, PersonType.Actor, Constants.Common.TotalActors)
+                };
 
-            if (resultShow != null)
+                return returnObj;
+            }
+            catch (Exception e)
             {
-                return PosterHelper.ConvertToShowPoster(resultShow, Constants.Shows.MostEpisodes);
+                Console.WriteLine(e);
+                throw;
             }
-
-            return new ShowPoster();
         }
 
-        private ShowPoster CalculateOldestPremieredShow(IReadOnlyList<Show> shows)
+
+        private Card<string> TotalTypeCount(IReadOnlyList<string> libraryIds, PersonType type, string title)
         {
-            var oldest = shows
-                .Where(x => x.PremiereDate.HasValue)
-                .OrderBy(x => x.PremiereDate)
-                .FirstOrDefault();
-
-            if (oldest != null)
+            var value = _showRepository.GetPeopleCount(libraryIds, type);
+            return new Card<string>
             {
-                return PosterHelper.ConvertToShowPoster(oldest, Constants.Shows.OldestPremiered);
-            }
-
-            return new ShowPoster();
-        }
-
-        private ShowPoster CalculateHighestRatedShow(IReadOnlyList<Show> shows)
-        {
-            var highest = shows
-                .Where(x => x.CommunityRating.HasValue)
-                .OrderByDescending(x => x.CommunityRating)
-                .FirstOrDefault();
-
-            if (highest != null)
-            {
-                return PosterHelper.ConvertToShowPoster(highest, Constants.Shows.HighestRatedShow);
-            }
-
-            return new ShowPoster();
-        }
-
-        private ShowPoster CalculateLowestRatedShow(IReadOnlyList<Show> shows)
-        {
-            var lowest = shows
-                .Where(x => x.CommunityRating.HasValue)
-                .OrderBy(x => x.CommunityRating)
-                .FirstOrDefault();
-
-            if (lowest != null)
-            {
-                return PosterHelper.ConvertToShowPoster(lowest, Constants.Shows.LowestRatedShow);
-            }
-
-            return new ShowPoster();
-        }
-
-        private Card<int> TotalShowCount(IReadOnlyList<Show> shows)
-        {
-            return new Card<int>
-            {
-                Title = Constants.Shows.TotalShows,
-                Value = shows.Count
+                Value = value.ToString(),
+                Title = title,
+                Icon = Constants.Icons.PeopleAltRoundedIcon,
+                Type = CardType.Text
             };
         }
 
-        private Card<int> TotalEpisodeCount(IReadOnlyList<Show> shows)
+        #endregion
+
+        #region Collected Rows
+
+        public ListContainer<ShowCollectionRow> GetCollectedRows(List<string> libraryIds, int page)
         {
-            return new Card<int>
+            var statistic = _statisticsRepository.GetLastResultByType(StatisticType.ShowCollectedRows, libraryIds);
+
+            ListContainer<ShowCollectionRow> rows = new ListContainer<ShowCollectionRow>();
+            if (StatisticsAreValid(statistic, libraryIds))
             {
-                Title = Constants.Shows.TotalEpisodes,
-                Value = shows.SelectMany(x => x.Episodes).Count()
+                rows.Data = JsonConvert.DeserializeObject<List<ShowCollectionRow>>(statistic.JsonResult);
+            }
+            else
+            {
+                rows.Data = CalculateCollectedRows(libraryIds);
+            }
+
+            rows.TotalCount = rows.Data.Count();
+            rows.Data = rows.Data.Skip(page * 30).Take(30);
+            return rows;
+        }
+
+        public List<ShowCollectionRow> CalculateCollectedRows(string libraryId)
+        {
+            return CalculateCollectedRows(new List<string> { libraryId });
+        }
+
+        public List<ShowCollectionRow> CalculateCollectedRows(List<string> libraryIds)
+        {
+            var shows = _showRepository.GetAllShows(libraryIds, true, true);
+
+            var stats = shows
+                .Select(CreateShowCollectedRow)
+                .OrderBy(x => x.SortName)
+                .ToList();
+            var json = JsonConvert.SerializeObject(stats);
+            _statisticsRepository.AddStatistic(json, DateTime.UtcNow, StatisticType.ShowCollectedRows, libraryIds);
+
+            return stats;
+        }
+
+        private ShowCollectionRow CreateShowCollectedRow(Show show)
+        {
+            var seasonCount = show.GetNonSpecialSeasonCount();
+
+            return new ShowCollectionRow
+            {
+                Title = show.Name,
+                SortName = show.SortName,
+                Episodes = show.CollectedEpisodeCount,
+                Seasons = seasonCount,
+                Specials = show.SpecialEpisodeCount,
+                MissingEpisodeCount = show.GetMissingEpisodeCount(),
+                MissingEpisodes = show.GetMissingEpisodes().GroupBy(x => x.SeasonNumber, (index, episodes) => new VirtualSeason { Episodes = episodes, SeasonNumber = index }),
+                PremiereDate = show.PremiereDate,
+                Status = show.Status == "Continuing",
+                Id = show.Id,
+                Banner = show.Banner,
+                Imdb = show.IMDB,
+                Tvdb = show.TVDB,
+                Size = show.GetShowSize()
             };
         }
 
-        private Card<int> TotalMissingEpisodeCount(IReadOnlyList<Show> shows)
-        {
-            var count = shows.Sum(x => x.MissingEpisodesCount);
-            return new Card<int>
-            {
-                Title = Constants.Shows.TotalMissingEpisodes,
-                Value = count
-            };
-        }
-
-        private TimeSpanCard CalculatePlayableTime(IReadOnlyList<Show> shows)
-        {
-            var playLength = new TimeSpan(shows.Sum(x => x.RunTimeTicks ?? 0));
-            return new TimeSpanCard
-            {
-                Title = Constants.Shows.TotalPlayLength,
-                Days = playLength.Days,
-                Hours = playLength.Hours,
-                Minutes = playLength.Minutes
-            };
-        }
+        #endregion
     }
 }

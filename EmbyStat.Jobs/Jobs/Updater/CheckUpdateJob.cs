@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading;
 using System.Threading.Tasks;
 using EmbyStat.Common;
 using EmbyStat.Common.Hubs.Job;
@@ -18,7 +17,7 @@ namespace EmbyStat.Jobs.Jobs.Updater
 
         public CheckUpdateJob(IJobHubHelper hubHelper, IJobRepository jobRepository,
             ISettingsService settingsService, IUpdateService updateService) 
-            : base(hubHelper, jobRepository, settingsService)
+            : base(hubHelper, jobRepository, settingsService, typeof(CheckUpdateJob), Constants.LogPrefix.CheckUpdateJob)
         {
             _updateService = updateService;
             _settingsService = settingsService;
@@ -34,7 +33,7 @@ namespace EmbyStat.Jobs.Jobs.Updater
             try
             {
                 await LogInformation("Contacting Github now to see if new version is available.");
-                var update = await _updateService.CheckForUpdateAsync(Settings, new CancellationToken(false));
+                var update = _updateService.CheckForUpdate(Settings);
                 await LogProgress(20);
                 if (update.IsUpdateAvailable && Settings.AutoUpdate)
                 {
@@ -45,6 +44,8 @@ namespace EmbyStat.Jobs.Jobs.Updater
                     Task.WaitAll(_updateService.DownloadZipAsync(update));
                     await LogProgress(50);
                     await _updateService.UpdateServerAsync();
+                    await _settingsService.SetUpdateInProgressSettingAsync(false);
+                    await HubHelper.BroadcastUpdateFinished(true);
                 }
                 else if (update.IsUpdateAvailable)
                 {
@@ -60,6 +61,7 @@ namespace EmbyStat.Jobs.Jobs.Updater
             {
                 await _settingsService.SetUpdateInProgressSettingAsync(false);
                 await HubHelper.BroadcastUpdateState(false);
+                await HubHelper.BroadcastUpdateFinished(false);
                 throw;
             }
         }
